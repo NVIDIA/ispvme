@@ -204,33 +204,6 @@ void sclock()
 **********************************************************************************/
 void ispVMDelay( unsigned short a_usTimeDelay )
 {
-	unsigned short loop_index     = 0;
-	unsigned short ms_index       = 0;
-	unsigned short us_index       = 0;
-
-	if ( a_usTimeDelay & 0x8000 ) /*Test for unit*/
-	{
-		a_usTimeDelay &= ~0x8000; /*unit in milliseconds*/
-	}
-	else { /*unit in microseconds*/
-		a_usTimeDelay = (unsigned short) (a_usTimeDelay/1000); /*convert to milliseconds*/
-		if ( a_usTimeDelay <= 0 ) {
-			 a_usTimeDelay = 1; /*delay is 1 millisecond minimum*/
-		}
-	}
-	/*Users can replace the following section of code by their own*/
-	for( ms_index = 0; ms_index < a_usTimeDelay; ms_index++)
-	{
-		/*Loop 1000 times to produce the milliseconds delay*/
-		for (us_index = 0; us_index < 1000; us_index++)
-		{ /*each loop should delay for 1 microsecond or more.*/
-			loop_index = 0;
-			do {
-				/*The NOP fakes the optimizer out so that it doesn't toss out the loop code entirely*/
-				__asm NOP
-			}while (loop_index++ < ((g_usCpu_Frequency/8)+(+ ((g_usCpu_Frequency % 8) ? 1 : 0))));/*use do loop to force at least one loop*/
-		}
-	}
 }
 
 /*********************************************************************************
