@@ -8,7 +8,7 @@ Redistribution and use in source and binary forms, with or without modification,
 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-“AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ï¿½AS ISï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
 HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
@@ -1382,6 +1382,7 @@ signed char ispVMShift( signed char a_cCode )
 		break;
 	case XSDR:  
 		g_usDataType |= EXPRESS; /*mark simultaneous in and out*/
+		// Intentional fall through
     case SDR:
 		g_usDataType |= SDR_DATA;
 		/* 1/15/04 If already in SHIFTDR, then do not move state or shift in header.  
@@ -1928,7 +1929,7 @@ signed char ispVMLCOUNT( unsigned short a_usCountSize )
 	unsigned char ucState             = 0;
 	unsigned short usDelay            = 0;
 	unsigned short usToggle           = 0;
-	unsigned char usByte              = 0;
+	unsigned char usByte __attribute__((unused))             = 0;
 
 	g_usIntelBufferSize = (unsigned short)ispVMDataSize();
 
@@ -2703,7 +2704,7 @@ signed char ispVMRead( unsigned short a_usiDataSize )
 		if(g_usChecksum != 0)
 		{
 			g_usChecksum &= 0xFFFF;
-			sprintf(StrChecksum,"Data Checksum: %.4X\n\n",g_usChecksum);
+			sprintf(StrChecksum,"Data Checksum: %.4lX\n\n",g_usChecksum);
 			vme_out_string(StrChecksum);
 			g_usChecksum = 0;
 		}

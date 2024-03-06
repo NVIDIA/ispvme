@@ -8,7 +8,7 @@ Redistribution and use in source and binary forms, with or without modification,
 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-“AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ï¿½AS ISï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
 HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
@@ -275,7 +275,9 @@ void ispVMMemManager( signed char cTarget, unsigned short usSize )
 		}
 		g_pucInData = ( unsigned char * ) malloc( usSize / 8 + 2 );
 		g_usPreviousSize = usSize;
+		// Intentional fall through
     case XTDO:
+		// Intentional fall through
     case TDO:
 		if ( g_pucOutData!= NULL ) { 
 			if ( g_usPreviousSize == usSize ) { /*already exist*/
@@ -635,7 +637,6 @@ int main( int argc, char * argv[] )
 {
 	unsigned short iCommandLineIndex  = 0;
 	short siRetCode                   = 0;
-	char szExtension[ 5 ]             = { 0 };
 	char szCommandLineArg[ 300 ]      = { 0 };
 	short sicalibrate                 = 0;
 
@@ -657,25 +658,6 @@ int main( int argc, char * argv[] )
 		vme_out_string( "\n\n");		
 		exit( 1 );
 	}
-	for ( iCommandLineIndex = 1; iCommandLineIndex < argc; iCommandLineIndex++ ) {
-		strcpy( szCommandLineArg, argv[ iCommandLineIndex ] );
-		if ( !strcmp( strlwr( szCommandLineArg ), "-c" ) && ( iCommandLineIndex == 1 ) ) {
-			sicalibrate = 1;
-		}
-		else if ( !strcmp( strlwr( szCommandLineArg ), "-c" ) && ( iCommandLineIndex != 1 ) ) {
-			vme_out_string( "Error: calibrate option -c must be the first argument\n\n" );
-			exit( 1 );
-		}
-		else 
-		{
-			strcpy( szExtension, &szCommandLineArg[ strlen( szCommandLineArg ) - 4 ] );
-			strlwr( szExtension );
-			if ( strcmp( szExtension, ".vme" ) ) {
-				vme_out_string( "Error: VME files must end with the extension *.vme\n\n" );
-				exit( 1 );
-			}
-		}
-	}
 	siRetCode = 0;
 	if(sicalibrate)
 	{
@@ -683,18 +665,15 @@ int main( int argc, char * argv[] )
 	}
 	for ( iCommandLineIndex = 1; iCommandLineIndex < argc; iCommandLineIndex++ ) {   /* Process all VME files sequentially */
 		strcpy( szCommandLineArg, argv[ iCommandLineIndex ] );
-		if ( !strcmp( strlwr( szCommandLineArg ), "-c" ) && ( iCommandLineIndex == 1 ) ) {
+		
+		vme_out_string( "Processing virtual machine file (");
+		vme_out_string( szCommandLineArg );
+		vme_out_string (")......\n\n");
+		siRetCode = ispVM( szCommandLineArg );
+		if ( siRetCode < 0 ) {
+			break;
 		}
-		else if ( !strcmp( strlwr( szCommandLineArg ), "-checksum" )) {}
-		else {
-			vme_out_string( "Processing virtual machine file (");
-			vme_out_string( szCommandLineArg );
-			vme_out_string (")......\n\n");
-			siRetCode = ispVM( szCommandLineArg );
-			if ( siRetCode < 0 ) {
-				break;
-			}
-		}
+		
 	}
 	if ( siRetCode < 0 ) {
 		error_handler( siRetCode, szCommandLineArg );
@@ -712,7 +691,7 @@ int main( int argc, char * argv[] )
 		if(g_usChecksum != 0)
 		{
 			g_usChecksum &= 0xFFFF;
-			printf("Data Checksum: %.4X\n\n",g_usChecksum);
+			printf("Data Checksum: %.4lX\n\n",g_usChecksum);
 			g_usChecksum = 0;
 		}
 	}
