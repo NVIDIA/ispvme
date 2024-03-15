@@ -9,6 +9,12 @@ project('ispvme',
 add_project_arguments('-Werror', language: ['c', 'cpp'])
 add_project_arguments('-Wall', language: ['c', 'cpp'])
 
+# Override TGT_PLAT through build and 
+# add a get_option for new platform support
+if get_option('TGT_PLAT') == 'OBMC_AST'
+  add_project_arguments('-DOBMC_AST', language: 'c')
+endif
+
 headers = [
   '.'
 ]
@@ -20,6 +26,13 @@ sources = [
 ]
 
 deps = []
+
+# Common configurations
+cdata = configuration_data()
+configure_file(output: 'config.h',
+            configuration: cdata, 
+)
+
 
 executable(
   'ispvme',

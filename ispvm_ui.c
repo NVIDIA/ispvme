@@ -35,11 +35,14 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * requested from Lattice's ispVMSupport.
 *
 ***************************************************************/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
+#include <stdint.h>
+#include <unistd.h>
 #include "vmopcode.h"
+#include "config.h"
 
 /***************************************************************
 *
@@ -70,6 +73,9 @@ signed char ispVM( const char * a_pszFilename );
 ***************************************************************/
 unsigned short g_usPreviousSize = 0;
 unsigned short g_usExpectedCRC = 0;
+int g_iDeviceFd = -1;
+char *g_devicePath = NULL;
+
 
 /***************************************************************
 *
@@ -80,6 +86,7 @@ extern signed char ispVMCode();
 extern void ispVMCalculateCRC32( unsigned char a_ucData );
 extern void ispVMStart();
 extern void ispVMEnd();
+extern uint8_t obmcHwInitialize();
 extern unsigned short g_usCalculatedCRC;
 extern unsigned short g_usDataType;
 extern unsigned char * g_pucOutMaskData,
@@ -99,6 +106,7 @@ extern unsigned short g_usIntelBufferSize;
 extern LVDSPair * g_pLVDSList;
 extern unsigned long g_usChecksum;
 extern unsigned int g_uiChecksumIndex;
+extern unsigned short g_usHardwareInitialized;
 /***************************************************************
 *
 * External variables and functions declared in hardware.c module.
@@ -629,6 +637,23 @@ signed char ispVM( const char * a_pszFilename )
 
 /***************************************************************
 *
+* Command line options
+*
+***************************************************************/
+static const struct option long_options[] = {
+	{ "device_path", required_argument, 0, 'd' }
+};
+static const char *short_options =
+	"d:c::";
+
+static void usage(void)
+{
+	printf("Usage: ispvme [option] -d device_path vme_file [vme_file]\n");
+}
+
+
+/***************************************************************
+*
 * main
 *
 ***************************************************************/
@@ -650,22 +675,63 @@ int main( int argc, char * argv[] )
 	vme_out_string( "\nFor daisy chain programming of all in-system programmable devices\n\n" );
 	
 	if ( argc < 2 ) {
-		vme_out_string( "\nUsage: vme [option] vme_file [vme_file]\n" );
-		vme_out_string( "Example: vme vme_file1.vme vme_file2.vme\n" );
+		vme_out_string( "\nUsage: ispvme [option] -d device_path vme_file [vme_file]\n" );
+		vme_out_string( "Example: ispvme -d /dev/device vme_file1.vme vme_file2.vme\n" );
 		vme_out_string( "option   -c:   do the calibration.\n" );
-		vme_out_string( "Example: vme -c\n" );
-		vme_out_string( "Example: vme -c vme_file1.vme vme_file2.vme\n" );		
+		vme_out_string( "Example: ispvme -c\n" );
+		vme_out_string( "option   -d:   device path.\n" );
+		vme_out_string( "Example: ispvme -d /dev/device [vme_file] \n" );
+		vme_out_string( "Example: ispvme -c vme_file1.vme vme_file2.vme\n" );		
 		vme_out_string( "\n\n");		
 		exit( 1 );
 	}
+
+	for (;;) {
+		int rc =
+			getopt_long(argc, argv, short_options, long_options, NULL);
+		if (rc == -1)
+			break;
+		else if (rc == 'd') {
+			g_devicePath = optarg;
+		}
+		else if (rc == 'c') {
+			sicalibrate = 1;
+			printf("calibration chosen\n");
+		}
+		else {
+			printf("Invalid argument: %i \n", rc);
+			usage();
+			exit( 1 );
+		}
+	}
+
+	if (optind >= argc) {
+		fprintf(stderr, "Missing files argument\n");
+		usage();
+		exit( 1 );
+	}
+
+
 	siRetCode = 0;
+
+#ifdef OBMC_AST
+	printf("device_path is: %s \n", g_devicePath);
+	uint8_t rc = obmcHwInitialize();
+	if (rc > 0) {
+			fprintf(stderr, "Error:  OBMC JTAG handle not found\n");
+			exit( rc );
+	}
+	
+#endif //OBMC_AST
+
 	if(sicalibrate)
 	{
 		calibration();
 	}
-	for ( iCommandLineIndex = 1; iCommandLineIndex < argc; iCommandLineIndex++ ) {   /* Process all VME files sequentially */
+
+	
+	for ( iCommandLineIndex = optind; iCommandLineIndex < argc; iCommandLineIndex++ ) {   /* Process all VME files sequentially */
 		strcpy( szCommandLineArg, argv[ iCommandLineIndex ] );
-		
 		vme_out_string( "Processing virtual machine file (");
 		vme_out_string( szCommandLineArg );
 		vme_out_string (")......\n\n");
@@ -695,6 +761,18 @@ int main( int argc, char * argv[] )
 			g_usChecksum = 0;
 		}
 	}
+
+	#ifdef OBMC_AST
+	
+	if (g_iDeviceFd >=0)
+       close(g_iDeviceFd);
+	else {
+		printf("Device was never opened");
+		exit( 1 );
+	}
+
+	#endif
+
 	exit( siRetCode );
 } 
 
