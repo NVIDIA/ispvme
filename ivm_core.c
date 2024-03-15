@@ -19,7 +19,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************************************************************************************************************************************************/
-
+#define VME_DEBUG 1
 #include <stdio.h>
 #include <string.h>
 #include "vmopcode.h"
@@ -2435,7 +2435,7 @@ signed char ispVMRead( unsigned short a_usiDataSize )
 {
 	unsigned short usDataSizeIndex    = 0;
 	unsigned short usErrorCount       = 0;
-	unsigned short usLastBitIndex     = 0;
+	unsigned short usLastBitIndex __attribute__((unused))     = 0;
 	unsigned char cDataByte           = 0;
 	unsigned char cMaskByte           = 0;
 	unsigned char cInDataByte         = 0;
@@ -2532,6 +2532,15 @@ signed char ispVMRead( unsigned short a_usiDataSize )
 			
 			usBufferIndex++;
 		}
+
+		/****************************************************************************
+		*
+		* Write TDI data to the port.
+		*
+		*****************************************************************************/
+		
+		writePort( g_ucPinTDI, ( unsigned char ) ( ( ( cInDataByte << cByteIndex ) & 0x80 ) ? 0x01 : 0x00 ) );
+		sclock();
 		
 		cCurBit = readPort();
 		
@@ -2563,34 +2572,6 @@ signed char ispVMRead( unsigned short a_usiDataSize )
 			}
 		}
 
-		/****************************************************************************
-		*
-		* Write TDI data to the port.
-		*
-		*****************************************************************************/
-		
-		writePort( g_ucPinTDI, ( unsigned char ) ( ( ( cInDataByte << cByteIndex ) & 0x80 ) ? 0x01 : 0x00 ) );
-		
-		if ( usDataSizeIndex < usLastBitIndex ) {
-
-			/****************************************************************************
-			*
-			* Clock data out from the data shift register.
-			*
-			*****************************************************************************/
-
-			sclock();
-		}
-		else if ( g_usFlowControl & CASCADE ) {
-			
-			/****************************************************************************
-			*
-			* Clock in last bit for the first N - 1 cascaded frames.
-			*
-			*****************************************************************************/
-
-			sclock();
-		}
 
 		/***************************************************************
 		*
@@ -3026,7 +3007,7 @@ signed char ispVMProcessLVDS( unsigned short a_usLVDSCount )
 	}
 
 #ifdef VME_DEBUG
-	printf( ");\n", a_usLVDSCount );
+	printf( "); %i \n", a_usLVDSCount );
 #endif //VME_DEBUG
 
 	return( 0 );

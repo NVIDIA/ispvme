@@ -1,0 +1,7 @@
+option(
+    'TGT_PLAT',
+    type: 'string',
+    value: 'OBMC_AST',
+    description: ''' Used to define driver that interfaces with Linux kernel '''
+)
+

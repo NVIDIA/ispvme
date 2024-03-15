@@ -20,15 +20,26 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************************************************************************************************************************************************/
 
+#include <stdio.h>
+#include <stdint.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include "jtag.h"
+
 /********************************************************************************
 * Declaration of global variables 
 *
 *********************************************************************************/
 
 unsigned char  g_siIspPins        = 0x00;   /*Keeper of JTAG pin state*/
+unsigned char  g_siIspPinsObmc        = 0x00;   /*Keeper of JTAG pin state for OBMC*/
 unsigned short g_usInPort         = 0x379;  /*Address of the TDO pin*/
 unsigned short g_usOutPort		  = 0x378;  /*Address of TDI, TMS, TCK pin*/
 unsigned short g_usCpu_Frequency  = 1000;   /*Enter your CPU frequency here, unit in MHz.*/
+unsigned short g_readTDO		  = 0;
+unsigned short g_usHardwareInitialized = 0;
+extern int g_iDeviceFd;
+extern char *g_devicePath;
 
 
 /*********************************************************************************
@@ -59,6 +70,7 @@ unsigned char readPort();
 void sclock();
 void ispVMDelay( unsigned short a_usTimeDelay );
 void calibration(void);
+uint8_t obmcHwInitialize(void);
 
 /********************************************************************************
 * writePort
@@ -98,11 +110,12 @@ void calibration(void);
 void writePort( unsigned char a_ucPins, unsigned char a_ucValue )
 {
 	if ( a_ucValue ) {
-		g_siIspPins = (unsigned char) (a_ucPins | g_siIspPins);
+		g_siIspPinsObmc = (unsigned char) (a_ucPins | g_siIspPinsObmc);
 	}
 	else {
-		g_siIspPins = (unsigned char) (~a_ucPins & g_siIspPins);
+		g_siIspPinsObmc = (unsigned char) (~a_ucPins & g_siIspPinsObmc);
 	}
+	printf("setting %x to %x; global state: %x\n", a_ucPins, a_ucValue, g_siIspPinsObmc);
 
 	/* This is a sample code for Windows/DOS without Windows Driver.
 	_outp( g_usOutPort, g_siIspPins );
@@ -118,7 +131,7 @@ void writePort( unsigned char a_ucPins, unsigned char a_ucValue )
 **********************************************************************************/
 unsigned char readPort()
 {
-	unsigned char ucRet = 0;
+	// unsigned char ucRet = 0;
 
 	/* This is a sample code for Windows/DOS
 	if ( _inp( g_usInPort ) & g_ucPinTDO ) {
@@ -128,7 +141,14 @@ unsigned char readPort()
        ucRet = 0x00;
     }
 	*/
-	return ( ucRet );
+#ifdef OBMC_AST
+	
+	// printf("setting %x to %x; global state: %x\n", a_ucPins, a_ucValue, g_siIspPinsObmc);
+	printf("read port\n");
+	return (unsigned char) g_readTDO;
+
+#endif //OBMC_AST
+	//return ( ucRet );
 } 
 
 /*********************************************************************************
@@ -136,22 +156,43 @@ unsigned char readPort()
 *
 * Apply a pulse to TCK.
 *
-* This function is located here so that users can modify to slow down TCK if
-* it is too fast (> 25MHZ). Users can change the IdleTime assignment from 0 to 
-* 1, 2... to effectively slowing down TCK by half, quarter...
 *
 *********************************************************************************/
 void sclock()
 {	
-	unsigned short IdleTime    = 0; //change to > 0 if need to slow down TCK
-	unsigned short usIdleIndex = 0;
-	IdleTime++;
-	for ( usIdleIndex = 0; usIdleIndex < IdleTime; usIdleIndex++ ) {
-		writePort( g_ucPinTCK, 0x01 );
+
+#ifdef OBMC_AST
+
+	struct tck_bitbang data;
+	struct bitbang_packet bb_packet;
+
+	if (!g_usHardwareInitialized)
+	{
+		uint8_t rc = obmcHwInitialize();
+		if (rc > 0) {
+			fprintf(stderr, "Error:  OBMC JTAG handle not found\n");
+			return;
+		}
 	}
-	for ( usIdleIndex = 0; usIdleIndex < IdleTime; usIdleIndex++ ) { 
-		writePort( g_ucPinTCK, 0x00 );
-	}
+
+	data.tms = (uint8_t) ((g_siIspPinsObmc >> 2) & 0x1);
+	data.tdi = (uint8_t) ((g_siIspPinsObmc) & 0x1);
+
+	bb_packet.length = 1;
+	bb_packet.data = &data;
+
+	if (g_iDeviceFd>0)
+		ioctl(g_iDeviceFd, JTAG_IOCBITBANG, &bb_packet);
+	else
+		printf("Device fd not valid");
+
+	g_readTDO = data.tdo & 0x1;
+	printf("tdo: %u, tdi: %u, tms: %u\n", g_readTDO, data.tdi, data.tms);
+
+#endif //OBMC_AST
+
+return;
+
 }
 /********************************************************************************
 *
@@ -234,4 +275,13 @@ void calibration(void)
 	writePort( g_ucPinTCK, 0x00 );
 	writePort( g_ucPinTCK, 0x01 );
 	writePort( g_ucPinTCK, 0x00 );
+}
+
+uint8_t obmcHwInitialize() {
+	g_iDeviceFd = open(g_devicePath, O_RDWR);
+	if (g_iDeviceFd < 0) {
+		return 1;
+	}
+	g_usHardwareInitialized = 1;
+	return 0;
 }
