@@ -24,7 +24,15 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
 #include "jtag.h"
+
+/********************************************************************************
+* Return codes
+*********************************************************************************/
+#define INVALID_JTAG_HANDLE -7
+#define KERNEL_WRITE_FAIL -8
 
 /********************************************************************************
 * Declaration of global variables 
@@ -67,7 +75,7 @@ const unsigned char g_ucPinTDO          = 0x40;    /* Bit address of TDO*/
 ***************************************************************/
 void writePort( unsigned char a_ucPins, unsigned char a_ucValue );
 unsigned char readPort();
-void sclock();
+int sclock();
 void ispVMDelay( unsigned short a_usTimeDelay );
 void calibration(void);
 uint8_t obmcHwInitialize(void);
@@ -115,7 +123,7 @@ void writePort( unsigned char a_ucPins, unsigned char a_ucValue )
 	else {
 		g_siIspPinsObmc = (unsigned char) (~a_ucPins & g_siIspPinsObmc);
 	}
-	printf("setting %x to %x; global state: %x\n", a_ucPins, a_ucValue, g_siIspPinsObmc);
+	// printf("setting %x to %x; global state: %x\n", a_ucPins, a_ucValue, g_siIspPinsObmc);
 
 	/* This is a sample code for Windows/DOS without Windows Driver.
 	_outp( g_usOutPort, g_siIspPins );
@@ -144,7 +152,7 @@ unsigned char readPort()
 #ifdef OBMC_AST
 	
 	// printf("setting %x to %x; global state: %x\n", a_ucPins, a_ucValue, g_siIspPinsObmc);
-	printf("read port\n");
+	// printf("read port\n");
 	return (unsigned char) g_readTDO;
 
 #endif //OBMC_AST
@@ -158,7 +166,7 @@ unsigned char readPort()
 *
 *
 *********************************************************************************/
-void sclock()
+int sclock()
 {	
 
 #ifdef OBMC_AST
@@ -169,9 +177,9 @@ void sclock()
 	if (!g_usHardwareInitialized)
 	{
 		uint8_t rc = obmcHwInitialize();
-		if (rc > 0) {
+		if (rc) {
 			fprintf(stderr, "Error:  OBMC JTAG handle not found\n");
-			return;
+			return rc;
 		}
 	}
 
@@ -181,17 +189,25 @@ void sclock()
 	bb_packet.length = 1;
 	bb_packet.data = &data;
 
-	if (g_iDeviceFd>0)
-		ioctl(g_iDeviceFd, JTAG_IOCBITBANG, &bb_packet);
-	else
+	if (g_iDeviceFd > 0) {
+		if( ioctl(g_iDeviceFd, JTAG_IOCBITBANG, &bb_packet) <0 ){
+			 printf("IOCTL failure: %d \n", errno);
+			 return KERNEL_WRITE_FAIL;
+		}
+	}
+
+	else {
 		printf("Device fd not valid");
+		return INVALID_JTAG_HANDLE;
+	}
 
 	g_readTDO = data.tdo & 0x1;
-	printf("tdo: %u, tdi: %u, tms: %u\n", g_readTDO, data.tdi, data.tms);
+	sleep(0.00000001);
+	// printf("tdo: %u, tdi: %u, tms: %u\n", g_readTDO, data.tdi, data.tms);
 
 #endif //OBMC_AST
 
-return;
+return 0;
 
 }
 /********************************************************************************
@@ -280,7 +296,7 @@ void calibration(void)
 uint8_t obmcHwInitialize() {
 	g_iDeviceFd = open(g_devicePath, O_RDWR);
 	if (g_iDeviceFd < 0) {
-		return 1;
+		return INVALID_JTAG_HANDLE;
 	}
 	g_usHardwareInitialized = 1;
 	return 0;

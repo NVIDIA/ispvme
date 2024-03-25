@@ -19,7 +19,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************************************************************************************************************************************************/
-#define VME_DEBUG 1
+// #define VME_DEBUG 1
 #include <stdio.h>
 #include <string.h>
 #include "vmopcode.h"
@@ -306,7 +306,7 @@ extern void ispVMMemManager( signed char types, unsigned short size );
 extern void ispVMDelay( unsigned short int a_usMicroSecondDelay );
 extern unsigned char readPort();
 extern void writePort( unsigned char pins, unsigned char value );
-extern void sclock();
+extern int sclock();
 extern signed char g_cCurrentJTAGState;
 extern const unsigned char g_ucPinTDI;
 extern const unsigned char g_ucPinTCK;
@@ -1358,6 +1358,7 @@ signed char ispVMShift( signed char a_cCode )
 	unsigned short iDataIndex  = 0;
 	unsigned short iReadLoop   = 0;
 	signed char cRetCode       = 0;
+	int rc					   = 0;
 	
 	cRetCode=0;
 	g_usiDataSize = (unsigned short) ispVMDataSize();
@@ -1376,7 +1377,9 @@ signed char ispVMShift( signed char a_cCode )
 			ispVMStateMachine( SHIFTIR );
 			if ( g_usHeadIR > 0 ){ 
 				ispVMBypass( HIR, g_usHeadIR );
-				sclock();
+				rc = sclock();
+				if (rc)
+					return rc;
 			}
 		}
 		break;
@@ -1399,7 +1402,9 @@ signed char ispVMShift( signed char a_cCode )
 					   the first cascaded frame. */
 					if ( g_usHeadDR > 0 ) {
 						ispVMBypass( HDR, g_usHeadDR );
-						sclock();
+						rc = sclock();
+						if (rc)
+							return rc;
 					}
 				}
 				else {
@@ -1411,7 +1416,9 @@ signed char ispVMShift( signed char a_cCode )
 				ispVMStateMachine( SHIFTDR );
 				if ( g_usHeadDR > 0 ) {
 					ispVMBypass( HDR, g_usHeadDR );
-					sclock();
+					rc = sclock();
+					if (rc)
+						return rc;
 				}
 			}
 		}
@@ -1457,14 +1464,18 @@ signed char ispVMShift( signed char a_cCode )
 			cRetCode = ispVMReadandSave( g_usiDataSize );
 			if(!cRetCode){
 				if ( g_usTailDR > 0 ) {
-					sclock();
+					rc = sclock();
+					if (rc)
+						return rc;
 					ispVMBypass( TDR, g_usTailDR ); 
 				}
 				ispVMStateMachine( DRPAUSE );
 				ispVMStateMachine( SHIFTDR );
 				if( g_usHeadDR > 0 ){
 					ispVMBypass( HDR, g_usHeadDR );
-					sclock();
+					rc = sclock();
+					if (rc)
+						return rc;
 				}
 				for ( iDataIndex=0; iDataIndex < g_usiDataSize / 8 + 1; iDataIndex++ )
 					g_pucInData[ iDataIndex ] = g_pucOutData[ iDataIndex ];
@@ -1509,7 +1520,9 @@ signed char ispVMShift( signed char a_cCode )
 		/* 1/15/04 If not performing cascading, then shift ENDIR */
 		if ( !( g_usFlowControl & CASCADE ) ) {
 			if ( g_usTailIR > 0 ) {
-				sclock();
+				rc = sclock();
+				if (rc)
+					return rc;
 				ispVMBypass( TIR, g_usTailIR );
 			}
 			ispVMStateMachine( g_ucEndIR );
@@ -1520,7 +1533,9 @@ signed char ispVMShift( signed char a_cCode )
 		/* 1/15/04 If not performing cascading, then shift ENDDR */
 		if ( !( g_usFlowControl & CASCADE ) ) {
 			if ( g_usTailDR > 0 ) {
-				sclock();
+				rc = sclock();
+				if (rc)
+					return rc;
 				ispVMBypass( TDR, g_usTailDR );
 			}
 			ispVMStateMachine( g_ucEndDR );
@@ -2229,8 +2244,12 @@ signed char ispVMLCOUNT( unsigned short a_usCountSize )
 void ispVMClocks( unsigned short Clocks )
 {
 	unsigned short iClockIndex = 0;
+	int rc = 0;
 	for ( iClockIndex = 0; iClockIndex < Clocks; iClockIndex++ ) {
-		sclock();
+		rc = sclock();
+		if (rc)
+			printf(" Clock cycle failed with rc = %d ", rc);
+
 	}
 }
 
@@ -2254,6 +2273,7 @@ void ispVMBypass( signed char ScanType, unsigned short Bits )
 	unsigned char cBitState     = 0;
 	unsigned char cCurByte      = 0;   
 	unsigned char * pcSource    = NULL;
+	int rc = 0;
 	
 	if ( Bits <= 0 ) {
 		return;
@@ -2286,7 +2306,10 @@ void ispVMBypass( signed char ScanType, unsigned short Bits )
 			}
 			cBitState = ( unsigned char ) ( ( ( cCurByte << iIndex % 8 ) & 0x80 ) ? 0x01 : 0x00 );
 			writePort( g_ucPinTDI, cBitState );
-			sclock();
+			rc = sclock();
+			if (rc)
+				printf(" Bypass State change failed with rc = %d ", rc);
+;
 		}   
 
 		if ( iIndex % 8 == 0 )  {
@@ -2314,6 +2337,7 @@ void ispVMStateMachine( signed char cNextJTAGState )
 	signed char cPathIndex  = 0;
 	signed char cStateIndex = 0;
 	short int	found       = 0;
+	int rc = 0;
 	
 	if ( ( g_cCurrentJTAGState == cNextJTAGState ) && ( cNextJTAGState != RESET ) ) {
 		return;
@@ -2335,7 +2359,9 @@ void ispVMStateMachine( signed char cNextJTAGState )
 			else {
 				writePort( g_ucPinTMS, ( unsigned char ) 0x00 );
 			}
-			sclock();
+			rc = sclock();
+			if (rc)
+				printf(" State change failed with rc = %d ", rc);
 		}
 		
 		writePort( g_ucPinTDI, 0x00 );
@@ -2397,6 +2423,7 @@ signed char ispVMSend( unsigned short a_usiDataSize )
 	unsigned short iInDataIndex = 0;
 	unsigned char cCurByte      = 0;
 	unsigned char cBitState     = 0;
+	int rc = 0;
 	
 	for ( iIndex = 0; iIndex < a_usiDataSize - 1; iIndex++ ) { 
 		if ( iIndex % 8 == 0 ) { 
@@ -2404,7 +2431,9 @@ signed char ispVMSend( unsigned short a_usiDataSize )
 		}
 		cBitState = ( unsigned char ) ( ( ( cCurByte << iIndex % 8 ) & 0x80 ) ? 0x01 : 0x00 );
 		writePort( g_ucPinTDI, cBitState );
-		sclock();
+		rc = sclock();
+		if (rc)
+			return rc;
 	}
 
 	if ( iIndex % 8 == 0 ) {
@@ -2417,7 +2446,9 @@ signed char ispVMSend( unsigned short a_usiDataSize )
 	writePort( g_ucPinTDI, cBitState );
 	if ( g_usFlowControl & CASCADE ) {
 		/* 1/15/04 Clock in last bit for the first n-1 cascaded frames */
-		sclock();
+		rc = sclock();
+		if (rc)
+			return rc;
 	}
 
 	return 0;
@@ -2446,6 +2477,7 @@ signed char ispVMRead( unsigned short a_usiDataSize )
 	unsigned char ucDisplayFlag       = 0x01;
 	char StrChecksum[256]            = {0};
 	unsigned char g_usCalculateChecksum = 0x00;
+	int rc = 0;
 
 	usLastBitIndex = (unsigned short)(a_usiDataSize - 1);
 	
@@ -2540,7 +2572,9 @@ signed char ispVMRead( unsigned short a_usiDataSize )
 		*****************************************************************************/
 		
 		writePort( g_ucPinTDI, ( unsigned char ) ( ( ( cInDataByte << cByteIndex ) & 0x80 ) ? 0x01 : 0x00 ) );
-		sclock();
+		rc = sclock();
+		if (rc)
+			return rc;
 		
 		cCurBit = readPort();
 		
@@ -2739,6 +2773,7 @@ signed char ispVMReadandSave( unsigned short int a_usiDataSize )
 	unsigned char cCurBit              = 0;
 	unsigned char cByteIndex           = 0;
 	signed char cLVDSByteIndex         = 0;
+	int rc = 0;
 
 	usLastBitIndex = (unsigned short) (a_usiDataSize - 1);
 	
@@ -2836,7 +2871,9 @@ signed char ispVMReadandSave( unsigned short int a_usiDataSize )
 		usOutBitIndex++;
 		writePort( g_ucPinTDI, cDataByte );
 		if ( usDataSizeIndex < usLastBitIndex ) {
-			sclock();
+			rc = sclock();
+			if (rc)
+				return rc;
 		}
 
 		/***************************************************************

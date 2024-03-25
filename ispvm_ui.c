@@ -668,11 +668,11 @@ int main( int argc, char * argv[] )
 	g_usChecksum = 0;
 	g_uiChecksumIndex = 0;
 	
-	vme_out_string( "                 Lattice Semiconductor Corp.\n" );
-	vme_out_string( "\n             ispVME(tm) V");
-    vme_out_string( VME_VERSION_NUMBER );
-    vme_out_string(" Copyright 1998-2023.\n");
-	vme_out_string( "\nFor daisy chain programming of all in-system programmable devices\n\n" );
+	// vme_out_string( "                 Lattice Semiconductor Corp.\n" );
+	// vme_out_string( "\n             ispVME(tm) V");
+    // vme_out_string( VME_VERSION_NUMBER );
+    // vme_out_string(" Copyright 1998-2023.\n");
+	// vme_out_string( "\nFor daisy chain programming of all in-system programmable devices\n\n" );
 	
 	if ( argc < 2 ) {
 		vme_out_string( "\nUsage: ispvme [option] -d device_path vme_file [vme_file]\n" );
@@ -734,7 +734,7 @@ int main( int argc, char * argv[] )
 		strcpy( szCommandLineArg, argv[ iCommandLineIndex ] );
 		vme_out_string( "Processing virtual machine file (");
 		vme_out_string( szCommandLineArg );
-		vme_out_string (")......\n\n");
+		vme_out_string (")..\n\n");
 		siRetCode = ispVM( szCommandLineArg );
 		if ( siRetCode < 0 ) {
 			break;
