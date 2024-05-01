@@ -258,8 +258,18 @@ return 0;
 * Users only need to enter the speed of the cpu.
 *
 **********************************************************************************/
-void ispVMDelay( unsigned short a_usTimeDelay __attribute__((unused)) )
+void ispVMDelay( unsigned short a_usTimeDelay)
 {
+    uint16_t delay_time = a_usTimeDelay & 0x7FFF; // Remove the flag bit
+    uint16_t unit_flag_mask = 0x8000; // Mask for extracting the unit flag
+
+    if (a_usTimeDelay & unit_flag_mask) {
+        // Millisecond delay
+        usleep(delay_time * 1000);
+    } else {
+        // Microsecond delay
+        usleep(delay_time);
+    }
 }
 
 /*********************************************************************************
