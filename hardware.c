@@ -202,7 +202,6 @@ int sclock()
 	}
 
 	g_readTDO = data.tdo & 0x1;
-	sleep(0.00000001);
 	// printf("tdo: %u, tdi: %u, tms: %u\n", g_readTDO, data.tdi, data.tms);
 
 #endif //OBMC_AST
